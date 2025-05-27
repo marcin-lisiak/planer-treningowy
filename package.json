@@ -1,0 +1,12 @@
+{
+  "name": "planer-treningowy",
+  "version": "1.0.0",
+  "description": "Aplikacja webowa do planowania i śledzenia treningów.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
