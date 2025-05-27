@@ -1,6 +1,7 @@
-import React from 'react';
-import { CssBaseline, Container, ThemeProvider, createTheme } from '@mui/material';
-import ExerciseList from './components/ExerciseList';
+import React, { useState } from 'react';
+import { Container, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import TrainingPlanList from './components/TrainingPlanList';
+import ActiveTraining from './components/ActiveTraining';
 
 const theme = createTheme({
   palette: {
@@ -15,11 +16,28 @@ const theme = createTheme({
 });
 
 function App() {
+  const [activeTrainingId, setActiveTrainingId] = useState<string | null>(null);
+
+  const handleStartTraining = (trainingId: string) => {
+    setActiveTrainingId(trainingId);
+  };
+
+  const handleCompleteTraining = () => {
+    setActiveTrainingId(null);
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Container>
-        <ExerciseList />
+        {activeTrainingId ? (
+          <ActiveTraining
+            trainingId={activeTrainingId}
+            onComplete={handleCompleteTraining}
+          />
+        ) : (
+          <TrainingPlanList />
+        )}
       </Container>
     </ThemeProvider>
   );
