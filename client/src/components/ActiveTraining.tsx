@@ -2,134 +2,320 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
+  Button,
+  TextField,
+  IconButton,
   List,
   ListItem,
   ListItemText,
-  Checkbox,
-  Button,
+  ListItemSecondaryAction,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Paper,
-  CircularProgress
+  Grid,
+  useTheme,
+  useMediaQuery,
+  Card,
+  CardContent,
+  CardActions,
+  Divider,
+  Chip
 } from '@mui/material';
-import axios from 'axios';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import SaveIcon from '@mui/icons-material/Save';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { TrainingPlan, Exercise } from '../types';
 
-interface Exercise {
-  _id: string;
-  name: string;
-  sets: number;
-  reps: number;
-  weight: number;
-  completed: boolean;
-}
-
-interface ActiveTraining {
-  _id: string;
-  trainingPlanId: string;
-  startTime: string;
-  exercises: Exercise[];
-}
-
-interface Props {
+interface ActiveTrainingProps {
   trainingId: string;
   onComplete: () => void;
 }
 
-const ActiveTraining: React.FC<Props> = ({ trainingId, onComplete }) => {
-  const [training, setTraining] = useState<ActiveTraining | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [timerActive, setTimerActive] = useState(true);
+const ActiveTraining: React.FC<ActiveTrainingProps> = ({ trainingId, onComplete }) => {
+  const [plan, setPlan] = useState<TrainingPlan | null>(null);
+  const [planName, setPlanName] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newExercise, setNewExercise] = useState<Exercise>({
+    id: '',
+    name: '',
+    sets: 3,
+    reps: 10,
+    weight: 0
+  });
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
-    fetchTraining();
-    const timer = setInterval(() => {
-      if (timerActive) {
-        setElapsedTime(prev => prev + 1);
+    try {
+      const savedPlans = localStorage.getItem('trainingPlans');
+      if (savedPlans) {
+        const plans = JSON.parse(savedPlans);
+        const currentPlan = plans.find((p: TrainingPlan) => p.id === trainingId);
+        if (currentPlan) {
+          setPlan(currentPlan);
+          setPlanName(currentPlan.name);
+        }
       }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const fetchTraining = async () => {
-    try {
-      const response = await axios.get(`http://localhost:5000/api/trainings/${trainingId}`);
-      setTraining(response.data);
     } catch (error) {
-      console.error('Błąd podczas pobierania treningu:', error);
+      console.error('Błąd podczas wczytywania planu:', error);
+    }
+  }, [trainingId]);
+
+  const savePlan = (updatedPlan: TrainingPlan) => {
+    try {
+      const savedPlans = localStorage.getItem('trainingPlans');
+      if (savedPlans) {
+        const plans = JSON.parse(savedPlans);
+        const updatedPlans = plans.map((p: TrainingPlan) =>
+          p.id === updatedPlan.id ? updatedPlan : p
+        );
+        localStorage.setItem('trainingPlans', JSON.stringify(updatedPlans));
+        setPlan(updatedPlan);
+      }
+    } catch (error) {
+      console.error('Błąd podczas zapisywania planu:', error);
     }
   };
 
-  const toggleExercise = async (exerciseId: string) => {
-    if (!training) return;
+  const handleAddExercise = () => {
+    if (plan && newExercise.name.trim()) {
+      const updatedPlan = {
+        ...plan,
+        exercises: [...plan.exercises, { ...newExercise, id: Date.now().toString() }]
+      };
+      savePlan(updatedPlan);
+      setNewExercise({ id: '', name: '', sets: 3, reps: 10, weight: 0 });
+      setIsDialogOpen(false);
+    }
+  };
 
-    const updatedExercises = training.exercises.map(ex => 
-      ex._id === exerciseId ? { ...ex, completed: !ex.completed } : ex
+  const handleDeleteExercise = (exerciseId: string) => {
+    if (plan) {
+      const updatedPlan = {
+        ...plan,
+        exercises: plan.exercises.filter((ex: Exercise) => ex.id !== exerciseId)
+      };
+      savePlan(updatedPlan);
+    }
+  };
+
+  const handleSavePlan = () => {
+    if (plan) {
+      const updatedPlan = {
+        ...plan,
+        name: planName
+      };
+      savePlan(updatedPlan);
+      onComplete(); // Powrót do menu głównego po zapisaniu
+    }
+  };
+
+  if (!plan) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 4 }}>
+        <Typography variant="h6" color="text.secondary">
+          Ładowanie planu...
+        </Typography>
+      </Box>
     );
-
-    setTraining({ ...training, exercises: updatedExercises });
-  };
-
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  const handleComplete = async () => {
-    if (!training) return;
-
-    try {
-      await axios.put(`http://localhost:5000/api/trainings/${trainingId}/complete`, {
-        exercises: training.exercises,
-        notes: ''
-      });
-      setTimerActive(false);
-      onComplete();
-    } catch (error) {
-      console.error('Błąd podczas kończenia treningu:', error);
-    }
-  };
-
-  if (!training) {
-    return <CircularProgress />;
   }
 
   return (
-    <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2 }}>
-      <Paper sx={{ padding: 2, marginBottom: 2 }}>
-        <Typography variant="h5" gutterBottom>
-          Trening w toku
-        </Typography>
-        <Typography variant="h6" color="primary">
-          Czas: {formatTime(elapsedTime)}
-        </Typography>
-      </Paper>
+    <Box>
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <IconButton 
+          onClick={onComplete}
+          color="primary"
+          size={isMobile ? "medium" : "large"}
+        >
+          <ArrowBackIcon />
+        </IconButton>
+        <TextField
+          fullWidth
+          value={planName}
+          onChange={(e) => setPlanName(e.target.value)}
+          variant="outlined"
+          size={isMobile ? "small" : "medium"}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              fontSize: { xs: '1.1rem', sm: '1.25rem' },
+              fontWeight: 500
+            }
+          }}
+        />
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<SaveIcon />}
+          onClick={handleSavePlan}
+          size={isMobile ? "medium" : "large"}
+        >
+          Zapisz i wróć
+        </Button>
+      </Box>
 
-      <List>
-        {training.exercises.map((exercise) => (
-          <Paper key={exercise._id} sx={{ marginBottom: 2, padding: 2 }}>
-            <ListItem>
-              <Checkbox
-                checked={exercise.completed}
-                onChange={() => toggleExercise(exercise._id)}
-              />
-              <ListItemText
-                primary={exercise.name}
-                secondary={`${exercise.sets} serie x ${exercise.reps} powtórzeń, ${exercise.weight}kg`}
-              />
-            </ListItem>
-          </Paper>
-        ))}
-      </List>
+      <Box sx={{ mb: 4 }}>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={() => setIsDialogOpen(true)}
+          fullWidth
+          size={isMobile ? "medium" : "large"}
+          sx={{ py: 1.5 }}
+        >
+          Dodaj ćwiczenie
+        </Button>
+      </Box>
 
-      <Button
-        variant="contained"
-        color="primary"
+      {plan.exercises.length === 0 ? (
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 4, 
+            textAlign: 'center',
+            backgroundColor: 'background.default',
+            borderRadius: 2
+          }}
+        >
+          <Typography variant="h6" color="text.secondary">
+            Brak ćwiczeń w planie. Dodaj swoje pierwsze ćwiczenie!
+          </Typography>
+        </Paper>
+      ) : (
+        <Grid container spacing={2}>
+          {plan.exercises.map((exercise) => (
+            <Grid item xs={12} sm={6} md={4} key={exercise.id}>
+              <Card 
+                elevation={2}
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 4
+                  }
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Typography variant="h6" gutterBottom>
+                    {exercise.name}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                    <Chip 
+                      label={`${exercise.sets} serie`} 
+                      color="primary" 
+                      variant="outlined"
+                      size={isMobile ? "small" : "medium"}
+                    />
+                    <Chip 
+                      label={`${exercise.reps} powtórzeń`} 
+                      color="secondary" 
+                      variant="outlined"
+                      size={isMobile ? "small" : "medium"}
+                    />
+                    {exercise.weight > 0 && (
+                      <Chip 
+                        label={`${exercise.weight} kg`} 
+                        color="info" 
+                        variant="outlined"
+                        size={isMobile ? "small" : "medium"}
+                      />
+                    )}
+                  </Box>
+                </CardContent>
+                <Divider />
+                <CardActions sx={{ justifyContent: 'flex-end', p: 2 }}>
+                  <IconButton
+                    edge="end"
+                    aria-label="delete"
+                    onClick={() => handleDeleteExercise(exercise.id)}
+                    color="error"
+                    size={isMobile ? "small" : "medium"}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
+
+      <Dialog 
+        open={isDialogOpen} 
+        onClose={() => setIsDialogOpen(false)}
         fullWidth
-        onClick={handleComplete}
-        disabled={!training.exercises.every(ex => ex.completed)}
+        maxWidth="xs"
       >
-        Zakończ Trening
-      </Button>
+        <DialogTitle>Dodaj nowe ćwiczenie</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Nazwa ćwiczenia"
+            type="text"
+            fullWidth
+            value={newExercise.name}
+            onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })}
+            variant="outlined"
+            sx={{ mt: 2 }}
+          />
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={4}>
+              <TextField
+                label="Serie"
+                type="number"
+                fullWidth
+                value={newExercise.sets}
+                onChange={(e) => setNewExercise({ ...newExercise, sets: parseInt(e.target.value) || 0 })}
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={4}>
+              <TextField
+                label="Powtórzenia"
+                type="number"
+                fullWidth
+                value={newExercise.reps}
+                onChange={(e) => setNewExercise({ ...newExercise, reps: parseInt(e.target.value) || 0 })}
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={4}>
+              <TextField
+                label="Ciężar (kg)"
+                type="number"
+                fullWidth
+                value={newExercise.weight}
+                onChange={(e) => setNewExercise({ ...newExercise, weight: parseInt(e.target.value) || 0 })}
+                variant="outlined"
+                size="small"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setIsDialogOpen(false)} color="inherit">
+            Anuluj
+          </Button>
+          <Button 
+            onClick={handleAddExercise} 
+            color="primary" 
+            variant="contained"
+            disabled={!newExercise.name.trim()}
+          >
+            Dodaj
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
