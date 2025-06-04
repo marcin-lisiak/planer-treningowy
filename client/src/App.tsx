@@ -82,7 +82,6 @@ function App() {
   const [completedTrainings, setCompletedTrainings] = useState<CompletedTraining[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     try {
